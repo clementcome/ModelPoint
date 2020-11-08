@@ -35,6 +35,7 @@ class ModelPointDefiner:
         init_mode: str = "random",
         truncate_cluster: int = 20,
         max_iter: int = 100,
+        num_threads: int = 4,
     ) -> None:
         n_clusters = self.N_ // n_estimation
         cluster_size = n_estimation
@@ -42,7 +43,11 @@ class ModelPointDefiner:
         self.lkm_ = LocKMeans(
             n_clusters, cluster_size, truncate_cluster, max_iter, self.hide_pbar_
         )
-        self.lkm_.fit(self.data_[self.variables_].values, init_mode=init_mode)
+        self.lkm_.fit(
+            self.data_[self.variables_].values,
+            init_mode=init_mode,
+            num_threads=num_threads,
+        )
         self.cluster_labels_ = self.lkm_.labels_
 
     def predict_cluster(self, X: np.ndarray) -> np.ndarray:

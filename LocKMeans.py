@@ -40,7 +40,7 @@ class LocKMeans:
         self.cluster_centers_ = None
         self.hide_pbar_ = hide_pbar
 
-    def fit(self, X, init_mode="random"):
+    def fit(self, X, init_mode="random", num_threads=4):
         """
         Complexity is linear on cluster_size and second degree on n_clusters
 
@@ -72,9 +72,6 @@ class LocKMeans:
 
         copy_X = X.copy()
         original_index = np.arange(n_samples)
-        points_cluster_order = np.tile(
-            np.arange(self.n_clusters_).reshape((1, -1)), (n_samples, 1)
-        )
 
         max_iter = self.max_iter_
         if init_mode == "kmeans":
@@ -93,7 +90,9 @@ class LocKMeans:
             list_cluster_size = [0 for _ in range(self.n_clusters_)]
             new_labels = np.repeat(-1, X.shape[0])
             knn_result = index_search.knnQueryBatch(
-                copy_X.astype(np.float32), k=self.truncate_cluster_, num_threads=4
+                copy_X.astype(np.float32),
+                k=self.truncate_cluster_,
+                num_threads=num_threads,
             )
             idx_data_centers, dist_data_centers = list(zip(*knn_result))
             idx_data_centers = np.array(idx_data_centers)
