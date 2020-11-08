@@ -1,3 +1,4 @@
+from numpy.core.fromnumeric import mean
 import pandas as pd
 import numpy as np
 
@@ -28,12 +29,20 @@ class ModelPointDefiner:
         self.n_model_ = 10
         self.hide_pbar_ = hide_pbar
 
-    def fit_cluster(self, n_estimation: int, max_iter: int = 100) -> None:
+    def fit_cluster(
+        self,
+        n_estimation: int,
+        init_mode: str = "random",
+        truncate_cluster: int = 20,
+        max_iter: int = 100,
+    ) -> None:
         n_clusters = self.N_ // n_estimation
         cluster_size = n_estimation
         self.n_estimation_ = n_estimation
-        self.lkm_ = LocKMeans(n_clusters, cluster_size, max_iter, self.hide_pbar_)
-        self.lkm_.fit(self.data_[self.variables_].values)
+        self.lkm_ = LocKMeans(
+            n_clusters, cluster_size, truncate_cluster, max_iter, self.hide_pbar_
+        )
+        self.lkm_.fit(self.data_[self.variables_].values, init_mode=init_mode)
         self.cluster_labels_ = self.lkm_.labels_
 
     def predict_cluster(self, X: np.ndarray) -> np.ndarray:
@@ -113,8 +122,12 @@ class ModelPointDefiner:
 
 def threshold_1d(definer: ModelPointDefiner, dimension: str, step_number: int = 10000):
     threshold = []
-    min_col, max_col = np.quantile(definer.data_[dimension], [0.0, 1.0])
-    data = pd.DataFrame(np.linspace(min_col, max_col, step_number), columns=[dimension])
+    data = pd.DataFrame(
+        np.quantile(definer.data_[dimension], np.linspace(0, 1, step_number)),
+        columns=[dimension],
+    )
+    mean_dimension = definer.data_[dimension].mean()
+    var_dimension = definer.data_[dimension].var()
     cst_variables = definer.variables_.drop(dimension)
     for variable in cst_variables:
         data[variable] = definer.data_[variable].median()
