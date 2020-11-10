@@ -33,22 +33,38 @@ class ModelPointDefiner:
         self,
         n_estimation: int,
         init_mode: str = "random",
+        fit_mode: str = "total",
+        batch_size: int = 10000,
+        alpha: float = 0.3,
         truncate_cluster: int = 20,
         max_iter: int = 100,
+        compute_loss: bool = False,
         num_threads: int = 4,
+        print_std: bool = False,
     ) -> None:
         n_clusters = self.N_ // n_estimation
         cluster_size = n_estimation
         self.n_estimation_ = n_estimation
         self.lkm_ = LocKMeans(
-            n_clusters, cluster_size, truncate_cluster, max_iter, self.hide_pbar_
+            n_clusters,
+            cluster_size,
+            truncate_cluster,
+            max_iter,
+            self.hide_pbar_,
+            compute_loss=compute_loss,
         )
         self.lkm_.fit(
             self.data_[self.variables_].values,
             init_mode=init_mode,
+            fit_mode=fit_mode,
+            batch_size=batch_size,
+            alpha=alpha,
             num_threads=num_threads,
+            print_std=print_std,
         )
-        self.cluster_labels_ = self.lkm_.labels_
+        self.cluster_labels_ = self.lkm_.predict(
+            self.data_[self.variables_].values, limit_cluster_size=True
+        )
 
     def predict_cluster(self, X: np.ndarray) -> np.ndarray:
         return self.lkm_.predict(X)
@@ -60,8 +76,12 @@ class ModelPointDefiner:
                 - model.n_components_ * 2
             )
 
+        self.points_in_cluster_ = self.cluster_labels_ > -1
         self.binomial_data_ = (
-            self.data_.groupby(self.cluster_labels_)[self.target_].sum().values
+            self.data_[self.points_in_cluster_]
+            .groupby(self.cluster_labels_[self.points_in_cluster_])[self.target_]
+            .sum()
+            .values
         )
         if p is None:
             p = 1
@@ -104,7 +124,12 @@ class ModelPointDefiner:
             data = np.concatenate(data, axis=1)
         else:
             data = data[0]
-        bsg_data = pd.DataFrame(data).groupby(self.cluster_labels_).mean().values
+        bsg_data = (
+            pd.DataFrame(data[self.points_in_cluster_])
+            .groupby(self.cluster_labels_[self.points_in_cluster_])
+            .mean()
+            .values
+        )
         self.bsg_ = BSG(self.n_estimation_)
         self.bsg_.fit_hierarchy(bsg_data, self.binomial_data_, self.p_values_)
 
