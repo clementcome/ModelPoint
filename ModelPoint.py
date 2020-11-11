@@ -151,13 +151,14 @@ class ModelPointDefiner:
 
 
 def threshold_1d(definer: ModelPointDefiner, dimension: str, step_number: int = 10000):
+    n_model = definer.n_model_
     threshold = []
     data = pd.DataFrame(
         np.quantile(definer.data_[dimension], np.linspace(0, 1, step_number)),
         columns=[dimension],
     )
-    mean_dimension = definer.data_[dimension].mean()
-    var_dimension = definer.data_[dimension].var()
+    # mean_dimension = definer.data_[dimension].mean()
+    # var_dimension = definer.data_[dimension].var()
     cst_variables = definer.variables_.drop(dimension)
     for variable in cst_variables:
         data[variable] = definer.data_[variable].median()
@@ -167,7 +168,11 @@ def threshold_1d(definer: ModelPointDefiner, dimension: str, step_number: int = 
         if current_label != label:
             threshold.append(dim_value)
             current_label = label
-    return threshold[1:]
+    threshold = np.array(threshold[1:])
+    index = np.sort(
+        np.argsort(np.diff(threshold, prepend=0) / threshold)[-n_model + 1 :]
+    )
+    return threshold[index]
 
 
 # np.random.seed(42)
