@@ -307,10 +307,10 @@ class LocKMeans:
                     list_cluster_size[cluster_idx] += 1
                     labels[point_index] = cluster_idx
                 else:
-                    idx_nn, _ = self.index_search_.knnQuery(
-                        X[point_index], k=self.n_clusters_
-                    )
-                    # idx_nn, _ = list(zip(*knn_point))
+                    dist_to_clusters = cdist(
+                        X[point_index].reshape(1, -1), self.cluster_centers_
+                    )[0]
+                    idx_nn = np.argsort(dist_to_clusters)
                     for cluster_idx in idx_nn:
                         if (
                             list_cluster_size[cluster_idx]
@@ -326,7 +326,7 @@ class LocKMeans:
 
 
 # np.random.seed(42)
-# n_cluster = 100
+# n_cluster = 10
 # n_estimation = 100
 # X = np.random.randn(n_cluster * n_estimation, 2).astype(np.float32)
 
