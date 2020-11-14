@@ -3,6 +3,7 @@ import scipy.stats as stats
 from scipy.special import binom
 from scipy.spatial.distance import pdist, squareform
 from scipy.cluster.hierarchy import linkage, fcluster, single, ward
+import pickle
 
 
 class BSG:
@@ -11,7 +12,7 @@ class BSG:
     and has also a Binomial distributed value associated to it.
     """
 
-    def __init__(self, n_estimation, p_penalization=None, verbose=False):
+    def __init__(self, n_estimation=100, p_penalization=None, verbose=False):
         self.n_estimation_ = n_estimation
         self.linkage_matrix_ = None
         if p_penalization is None:
@@ -19,6 +20,24 @@ class BSG:
         else:
             self.p_penalization_ = p_penalization
         self.verbose_ = verbose
+
+    def save(self, file):
+        with open(file, "wb") as f:
+            pickle.dump(
+                {
+                    "n_estimation": self.n_estimation_,
+                    "linkage_matrix": self.linkage_matrix_,
+                    "labels": self.labels_,
+                },
+                f,
+            )
+
+    def load(self, file):
+        with open(file, "rb") as f:
+            attributes = pickle.load(f)
+        self.n_estimation_ = attributes["n_estimation"]
+        self.linkage_matrix_ = attributes["linkage_matrix"]
+        self.labels_ = attributes["labels"]
 
     def dist_proba(self, xp, yp):
         x_min, x_max = int(min(xp[0], yp[0])), int(max(xp[0], yp[0]))

@@ -3,6 +3,7 @@ from scipy.special import binom
 from tqdm import tqdm
 import plotly.graph_objects as go
 import scipy.stats as stats
+import pickle
 
 
 def plot_binomial_mixture(p_values, proportions=None, S=None, n_estimation=100):
@@ -43,6 +44,28 @@ class BinomialEM:
         self.hide_pbar_ = hide_pbar
         self.lambd_ = None
         self.p_ = None
+
+    def save(self, file):
+        with open(file, "wb") as f:
+            pickle.dump(
+                {
+                    "n_components": self.n_components_,
+                    "n_estimation": self.n_estimation_,
+                    "hide_pbar": self.hide_pbar_,
+                    "lambd": self.lambd_,
+                    "p": self.p_,
+                },
+                f,
+            )
+
+    def load(self, file):
+        with open(file, "rb") as f:
+            attributes = pickle.load(f)
+        self.n_components_ = attributes["n_components"]
+        self.n_estimation_ = attributes["n_estimation"]
+        self.hide_pbar_ = attributes["hide_pbar"]
+        self.lambd_ = attributes["lambd"]
+        self.p_ = attributes["p"]
 
     def f(self, i: int):
         return (

@@ -1,6 +1,7 @@
 from numpy.core.fromnumeric import mean
 import pandas as pd
 import numpy as np
+import pickle
 
 from sklearn.preprocessing import MinMaxScaler
 
@@ -15,19 +16,75 @@ from BinomialSimilarityGrouping import BSG
 
 class ModelPointDefiner:
     def __init__(
-        self, data: pd.DataFrame, target: str, hide_pbar: bool = False
+        self, data: pd.DataFrame = None, target: str = None, hide_pbar: bool = False
     ) -> None:
-        self.data_ = data
-        self.N_ = self.data_.shape[0]
-        self.variables_ = data.columns.drop(target)
-        self.target_ = target
-        self.scaler_n_ = MinMaxScaler()
-        self.data_n_ = self.scaler_n_.fit_transform(self.data_[self.variables_].values)
-        self.epsilon_ = 1e-6
-        self.scaler_ln_ = LogMinMaxScaler()
-        self.data_ln_ = self.scaler_ln_.fit_transform(self.data_n_ + self.epsilon_)
-        self.n_model_ = 10
+        if (data is None) or (target is None):
+            print(
+                "You did not provide a dataset, this behavior suppose that you will load a previously saved ModelPointDefiner before using it"
+            )
+        else:
+            self.data_ = data
+            self.N_ = self.data_.shape[0]
+            self.variables_ = data.columns.drop(target)
+            self.target_ = target
+            self.scaler_n_ = MinMaxScaler()
+            self.data_n_ = self.scaler_n_.fit_transform(
+                self.data_[self.variables_].values
+            )
+            self.epsilon_ = 1e-6
+            self.scaler_ln_ = LogMinMaxScaler()
+            self.data_ln_ = self.scaler_ln_.fit_transform(self.data_n_ + self.epsilon_)
+            self.n_model_ = 10
         self.hide_pbar_ = hide_pbar
+        self.cluster_labels_ = None
+        self.n_estimation_ = None
+        self.points_in_cluster_ = None
+        self.binomial_data_ = None
+        self.p_labels_ = None
+        self.p_values_ = None
+        self.n_model_ = None
+        self.hierarchy_ = None
+        self.lkm_ = LocKMeans()
+        self.bem_ = BinomialEM()
+        self.bsg_ = BSG()
+
+    def save(self, filename):
+        with open(f"{filename}_mpd_attributes.pkl", "wb") as f:
+            pickle.dump(
+                {
+                    "data": self.data_,
+                    "target": self.target_,
+                    "cluster_labels": self.cluster_labels_,
+                    "n_estimation": self.n_estimation_,
+                    "points_in_cluster": self.points_in_cluster_,
+                    "binomial_data": self.binomial_data_,
+                    "p_labels": self.p_labels_,
+                    "p_values": self.p_values_,
+                    "n_model": self.n_model_,
+                    "hierarchy": self.hierarchy_,
+                    "hide_pbar": self.hide_pbar_,
+                },
+                f,
+            )
+        self.lkm_.save(f"{filename}_mpd_lkm.pkl")
+        self.bem_.save(f"{filename}_mpd_bem.pkl")
+        self.bsg_.save(f"{filename}_mpd_bsg.pkl")
+
+    def load(self, filename):
+        with open(f"{filename}_mpd_attributes.pkl", "rb") as f:
+            attributes = pickle.load(f)
+        self.__init__(attributes["data"], attributes["target"], attributes["hide_pbar"])
+        self.cluster_labels_ = attributes["cluster_labels"]
+        self.n_estimation_ = attributes["n_estimation"]
+        self.points_in_cluster_ = attributes["points_in_cluster"]
+        self.binomial_data_ = attributes["binomial_data"]
+        self.p_labels_ = attributes["p_labels"]
+        self.p_values_ = attributes["p_values"]
+        self.n_model_ = attributes["n_model"]
+        self.hierarchy_ = attributes["hierarchy"]
+        self.lkm_.load(f"{filename}_mpd_lkm.pkl")
+        self.bem_.load(f"{filename}_mpd_bem.pkl")
+        self.bsg_.load(f"{filename}_mpd_bsg.pkl")
 
     def fit_cluster(
         self,
@@ -104,8 +161,8 @@ class ModelPointDefiner:
         self.p_values_ = self.bem_.p_[self.p_labels_]
 
     def p_of_cluster(self, cluster_label: int) -> float:
-        p_label = self.p_labels_[cluster_label]
-        p = self.bem_.p_[p_label]
+        # p_label = self.p_labels_[cluster_label]
+        p = self.p_labels_[cluster_label]
         return p
 
     def fit_BSG(self, columns=None, normalization=None):
@@ -157,8 +214,6 @@ def threshold_1d(definer: ModelPointDefiner, dimension: str, step_number: int = 
         np.quantile(definer.data_[dimension], np.linspace(0, 1, step_number)),
         columns=[dimension],
     )
-    # mean_dimension = definer.data_[dimension].mean()
-    # var_dimension = definer.data_[dimension].var()
     cst_variables = definer.variables_.drop(dimension)
     for variable in cst_variables:
         data[variable] = definer.data_[variable].median()

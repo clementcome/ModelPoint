@@ -4,6 +4,7 @@ from scipy.spatial.distance import cdist
 from tqdm import tqdm
 from sklearn.cluster import KMeans
 import nmslib
+import pickle
 
 
 class LocKMeans:
@@ -44,6 +45,29 @@ class LocKMeans:
         self.compute_loss_ = compute_loss
         if self.compute_loss_:
             self.loss_history_ = np.zeros(max_iter)
+
+    def save(self, file):
+        with open(file, "wb") as f:
+            pickle.dump(
+                {
+                    "n_clusters": self.n_clusters_,
+                    "cluster_size": self.cluster_size_,
+                    "cluster_centers": self.cluster_centers_,
+                    "hide_pbar": self.hide_pbar_,
+                },
+                f,
+            )
+
+    def load(self, file):
+        with open(file, "rb") as f:
+            attributes = pickle.load(f)
+        self.n_clusters_ = attributes["n_clusters"]
+        self.cluster_size_ = attributes["cluster_size"]
+        self.cluster_centers_ = attributes["cluster_centers"]
+        self.hide_pbar_ = attributes["hide_pbar"]
+        self.index_search_ = nmslib.init(space="l2")
+        self.index_search_.addDataPointBatch(self.cluster_centers_.astype(np.float32))
+        self.index_search_.createIndex()
 
     def compute_std(self, labels=None, remove_outlier=True):
         if labels is None:
@@ -301,7 +325,7 @@ class LocKMeans:
         if limit_cluster_size:
             labels = np.repeat(-1, X.shape[0])
             order = np.argsort(np.min(dist_data_centers, axis=1))
-            for point_index in tqdm(order):
+            for point_index in tqdm(order, disable=self.hide_pbar_):
                 cluster_idx = idx_data_centers[point_index, 0]
                 if list_cluster_size[cluster_idx] < self.cluster_size_[cluster_idx]:
                     list_cluster_size[cluster_idx] += 1
