@@ -215,19 +215,18 @@ def threshold_1d(definer: ModelPointDefiner, dimension: str, step_number: int = 
         columns=[dimension],
     )
     cst_variables = definer.variables_.drop(dimension)
-    for variable in cst_variables:
-        data[variable] = definer.data_[variable].median()
-    mp_labels = definer.model_from_data(data.values)
-    current_label = -1
-    for dim_value, label in zip(data[dimension], mp_labels):
-        if current_label != label:
-            threshold.append(dim_value)
-            current_label = label
-    threshold = np.array(threshold[1:])
-    index = np.sort(
-        np.argsort(np.diff(threshold, prepend=0) / threshold)[-n_model + 1 :]
+    dimension_bin = pd.cut(
+        definer.data_[dimension],
+        np.quantile(definer.data_[dimension], np.linspace(0, 1, step_number)),
+        include_lowest=True,
     )
-    return threshold[index]
+    group_data = definer.data_.groupby(dimension_bin, as_index=False)
+    for variable in cst_variables:
+        data[variable] = group_data[variable].median()
+    data = data.fillna(definer.data_[cst_variables].median())
+    mp_labels = definer.model_from_data(data.values)
+    data_by_mp = data.groupby(mp_labels)
+    return data_by_mp[dimension].quantile(0.95).sort_values().values[:-1]
 
 
 # np.random.seed(42)
