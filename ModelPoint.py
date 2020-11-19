@@ -207,26 +207,60 @@ class ModelPointDefiner:
         return model_point_labels
 
 
-def threshold_1d(definer: ModelPointDefiner, dimension: str, step_number: int = 10000):
+def threshold_1d(
+    definer: ModelPointDefiner,
+    dimension: str,
+    step_number: int = 10000,
+    q: float = 0.9,
+    return_fake_data: bool = False,
+):
     n_model = definer.n_model_
-    threshold = []
     data = pd.DataFrame(
-        np.quantile(definer.data_[dimension], np.linspace(0, 1, step_number)),
+        np.unique(
+            np.quantile(definer.data_[dimension], np.linspace(0, 1, step_number))
+        ),
         columns=[dimension],
     )
     cst_variables = definer.variables_.drop(dimension)
     dimension_bin = pd.cut(
         definer.data_[dimension],
-        np.quantile(definer.data_[dimension], np.linspace(0, 1, step_number)),
+        np.unique(
+            np.quantile(definer.data_[dimension], np.linspace(0, 1, step_number))
+        ),
         include_lowest=True,
     )
     group_data = definer.data_.groupby(dimension_bin, as_index=False)
     for variable in cst_variables:
-        data[variable] = group_data[variable].median()
+        data[variable] = group_data[variable].median() + group_data[
+            variable
+        ].std().multiply(np.random.randn(len(group_data)), axis=0)
     data = data.fillna(definer.data_[cst_variables].median())
     mp_labels = definer.model_from_data(data.values)
-    data_by_mp = data.groupby(mp_labels)
-    return data_by_mp[dimension].quantile(0.95).sort_values().values[:-1]
+    label_groups = mp_labels.reshape(-1, 100)
+    value_groups = data[dimension].values.reshape(-1, 100)
+    max_label = mp_labels.max()
+    min_label = mp_labels.min()
+
+    def f_prop(min, max):
+        def func(arr):
+            ans = np.zeros(max - min + 1)
+            value_list, count_list = np.unique(arr, return_counts=True)
+            total = np.sum(count_list)
+            for value, count in zip(value_list, count_list):
+                ans[value - min] = count / total
+            return ans
+
+        return func
+
+    prop_along_axis = np.apply_along_axis(f_prop(min_label, max_label), 1, label_groups)
+    threshold = np.where(np.diff(np.argmax(prop_along_axis, axis=1)) != 0)[0]
+    index = np.sort(
+        np.argsort(np.diff(threshold, prepend=0) / threshold)[-n_model + 1 :]
+    )
+    threshold = np.median(value_groups[threshold[index]], axis=1)
+    if return_fake_data:
+        return threshold, data
+    return threshold
 
 
 # np.random.seed(42)
